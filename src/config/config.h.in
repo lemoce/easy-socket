@@ -1,0 +1,43 @@
+#ifndef __CONFIG_H__
+#define __CONFIG_H__
+
+#include <string>
+
+#cmakedefine USE_WINSOCK
+
+#ifdef USE_WINSOCK
+#include <ws2tcpip.h>
+#include <windows.h>
+
+#ifdef __MINGW32__
+#include <basetsd.h>
+#else
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#endif
+
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+
+#endif
+
+#ifdef USE_POSIX
+#include <mingw.thread.h>
+#endif
+
+#else // POSIX
+
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+#endif
+
+#include "arch.h"
+
+static std::string ARCH_MODEL = "@CMAKE_LIBRARY_ARCHITECTURE@";
+
+#endif

@@ -1,0 +1,11 @@
+if (WIN32)
+    set (PLATFORM_LIBRARY "arch/win32.cpp")
+else ()
+    set (PLATFORM_LIBRARY "arch/posix.cpp")
+endif()
+
+add_library (socket socket.cpp ${PLATFORM_LIBRARY})
+if (WIN32)
+    target_link_libraries (socket wsock32 ws2_32)
+endif()
+set_property (TARGET socket PROPERTY CXX_STANDARD 11)
