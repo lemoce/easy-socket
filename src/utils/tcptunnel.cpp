@@ -13,6 +13,9 @@
 #include "socket.h"
 
 
+const int MESSAGE_BUFFER = 8096;
+
+
 void threadManager(std::list<std::pair<std::shared_ptr<std::atomic<bool>>, std::unique_ptr<std::thread>>> & threads)
 {
   std::cout << "iniciei gerenciador de threads" << std::endl;
@@ -30,7 +33,7 @@ void threadManager(std::list<std::pair<std::shared_ptr<std::atomic<bool>>, std::
               (it->second)->join();
               (it->second).reset();
               it = threads.erase(it);
-              std::cout << "removi thread inutilizada " << (i+1) << std::endl;
+              // std::cout << "removi thread inutilizada " << (i+1) << std::endl;
             }
           else
             {
@@ -43,11 +46,14 @@ void threadManager(std::list<std::pair<std::shared_ptr<std::atomic<bool>>, std::
 
 void tunnelingTask(std::unique_ptr<lemoce::ClientSocket> server_ptr,
                    std::unique_ptr<lemoce::ClientSocket> client_ptr,
+                   std::unique_ptr<char []> buffer,
                    std::shared_ptr<std::atomic<bool>> done)
 {
 
   lemoce::ClientSocket server = *server_ptr;
   lemoce::ClientSocket client = *client_ptr;
+  char * charbuf;
+  charbuf = static_cast<char *>(buffer.get());
   
   try
     {
@@ -55,31 +61,27 @@ void tunnelingTask(std::unique_ptr<lemoce::ClientSocket> server_ptr,
       while(!server.isClosed())
         {
       
-          std::unique_ptr<std::string> incomingMessage = client.read();
-          if ((*incomingMessage).size() == 0)
+          int len = client.read(charbuf, MESSAGE_BUFFER);
+          if (len == 0)
             {
               server.close();
               client.close();
               break;
             }
-          std::cout << " ==> " << (*incomingMessage) << std::endl;
+          //std::cout << " ==> " << buffer << std::endl;
 
-          std::string * tmpMessage = incomingMessage.get();
-                  
-          server.write((*tmpMessage));
-          std::cout << (*tmpMessage) << " ==>" << std::endl;
-          std::unique_ptr<std::string> responseMessage = server.read();
-          if ((*responseMessage).size() == 0)
+          server.write(charbuf, len);
+          // std::cout << (*tmpMessage) << " ==>" << std::endl;
+          len = server.read(charbuf, MESSAGE_BUFFER);
+          if (len == 0)
             {
               server.close();
               client.close();
               break;
             }
-          std::cout << (*responseMessage) << " <==" << std::endl;
+          //std::cout << buffer << " <==" << std::endl;
 
-          tmpMessage = responseMessage.get();
-          client.write((*tmpMessage));
-          std::cout << " <== " << (*tmpMessage) <<  std::endl;
+          client.write(charbuf, len);
         }
     }
   catch (lemoce::SocketException & ex)
@@ -128,6 +130,8 @@ int main(int argc, char *argv[])
           std::unique_ptr<lemoce::ClientSocket> client_ptr{new lemoce::ClientSocket{}};
           std::unique_ptr<lemoce::ClientSocket> remoteClient_ptr;
 
+          std::unique_ptr<char []> buffer{new char[MESSAGE_BUFFER]};
+
           try
             {
               server.accept((*client_ptr));
@@ -154,6 +158,7 @@ int main(int argc, char *argv[])
             {
               tunnelingTask, std::move(remoteClient_ptr),
               std::move(client_ptr),
+              std::move(buffer),
               done
             }};
           

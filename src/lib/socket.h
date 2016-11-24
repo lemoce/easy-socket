@@ -42,15 +42,18 @@ namespace lemoce {
     std::string getLocalHost() const;
     void setLocalPort(int);
     int getLocalPort() const;
+    void setBufferSize(int);
+    int getBufferSize() const;
 
     void connect();
     std::unique_ptr<std::string> read();
-    std::unique_ptr<std::string> read(const size_t n);
+    int read(char msg[], const size_t n);
     void write(const std::string& message);
+    void write(const char * msg, const size_t n);
     
   private:
 
-    static const int MESSAGE_BUFFER;
+    int bufferSize;
     void fillLocalHostPort();
     
     std::string remoteHost; //!< Brief host do servidor

@@ -11,7 +11,6 @@
 #include "socket.h"
 
 // TODO Remover Message Buffer
-const int lemoce::ClientSocket::MESSAGE_BUFFER = 8192;
 int lemoce::ServerSocket::BACKLOG = 512;
 
 lemoce::Socket::Socket()
@@ -50,12 +49,17 @@ void lemoce::Socket::close()
 }
 
 
-lemoce::ClientSocket::ClientSocket() { }
+lemoce::ClientSocket::ClientSocket()
+{
+  bufferSize = 8192;
+}
 
 
-lemoce::ClientSocket::ClientSocket(std::string remote, int port):
-  lemoce::Socket{}, remotePort(port), remoteHost{remote} { }
-
+lemoce::ClientSocket::ClientSocket(std::string remote, int port): ClientSocket{}
+{
+  remotePort = port;
+  remoteHost = remote;
+}
 
 void lemoce::ClientSocket::connect()
 {
@@ -88,30 +92,14 @@ void lemoce::ClientSocket::connect()
   localPort = lPort;
 }
 
-// TODO deletar essa ou de baixo
 std::unique_ptr<std::string> lemoce::ClientSocket::read()
 {
-  char chararray[MESSAGE_BUFFER + 1];
+  char chararray[bufferSize];
   std::ostringstream buffer;
   int nread;
 
-  while (((nread = ::recv(getFd(), chararray, MESSAGE_BUFFER, 0)) < 0))
-    {
-      if (errno == EINTR)
-        {
-          continue;
-        }
-      else
-        {
-          throw new SocketException{errno};
-        }
-    }
-
-  if (nread < MESSAGE_BUFFER)
-    {
-      chararray[nread] = '\0';
-    }
-  
+  read(chararray, bufferSize);
+    
   buffer << chararray;
   
   std::unique_ptr<std::string> result{new std::string{buffer.str()}};
@@ -119,49 +107,52 @@ std::unique_ptr<std::string> lemoce::ClientSocket::read()
   return result;
 }
 
-// TODO Modificar para aceitar array de bytes
-std::unique_ptr<std::string> lemoce::ClientSocket::read(const size_t n)
+int lemoce::ClientSocket::read(char msg[], const size_t n)
 {
-  std::ostringstream buffer;
-
+  size_t nleft;
   ssize_t nread;
+  char *ptr;
 
-  size_t left = n;
-  char chararray[n];
-  char * ptr = chararray;
-  
-  while (left > 0)
+  ptr = msg;
+  nleft = n;
+
+  while (nleft > 0)
     {
       if ((nread = ::recv(getFd(), ptr, n, 0)) < 0)
         {
           if (errno == EINTR)
-            nread = 0;
+            {
+              nread = 0;
+              continue;
+            }
           else
-            throw new SocketException{errno};
+            treatSocketError(false);
         }
-      else if (nread == 0)
-        break;
 
-      left -= nread;
+      nleft -= nread;
       ptr = ptr + nread;
+      break;
     }
 
-  buffer << chararray;
+  if (nleft > 0)
+    {
+      msg[n - nleft] = '\0';
+    }
 
-  std::unique_ptr<std::string> result{new std::string{buffer.str()}};
-  
-  return std::move(result);
+  return (n - nleft);
 }
-
 
 // TODO Modificar para array de bytes
 void lemoce::ClientSocket::write(const std::string& message)
 {
+  write(message.c_str(), message.size());
+}
 
-  size_t nleft = message.size();
-  const char * ptr = message.c_str();
-
+void lemoce::ClientSocket::write(const char * msg, size_t n)
+{
+  size_t nleft = n;
   ssize_t nwritten = nleft;
+  const char * ptr = msg;
 
   while (nleft > 0)
     {
@@ -170,11 +161,11 @@ void lemoce::ClientSocket::write(const std::string& message)
           if (nwritten < 0 && errno == EINTR)
             nwritten = 0;
           else
-            throw new SocketException{errno};
+            treatSocketError(false);
         }
       nleft -= nwritten;
       ptr += nwritten;
-    }
+    }  
 }
 
 void lemoce::ClientSocket::setRemoteHost(std::string rHost)
@@ -216,6 +207,17 @@ int lemoce::ClientSocket::getLocalPort() const
 {
   return localPort;
 }
+
+void lemoce::ClientSocket::setBufferSize(int size)
+{
+  bufferSize = size;
+}
+
+int lemoce::ClientSocket::getBufferSize() const
+{
+  return bufferSize;
+}
+
 
 lemoce::ServerSocket::ServerSocket(int lPort):
   lemoce::Socket{}, localPort(lPort) { }
