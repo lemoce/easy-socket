@@ -94,7 +94,7 @@ void lemoce::ClientSocket::connect()
 
 std::unique_ptr<std::string> lemoce::ClientSocket::read()
 {
-  char chararray[bufferSize];
+  char * chararray = new char[getBufferSize()];
   std::ostringstream buffer;
   int nread;
 
@@ -104,6 +104,8 @@ std::unique_ptr<std::string> lemoce::ClientSocket::read()
   
   std::unique_ptr<std::string> result{new std::string{buffer.str()}};
 
+  delete [] chararray;
+  
   return result;
 }
 
